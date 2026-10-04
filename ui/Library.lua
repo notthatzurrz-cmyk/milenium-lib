@@ -897,13 +897,18 @@
                     local icon_data = nil
                     if type(cfg.icon) == "string" then
                         if library.resolve_icon then
-                            icon_data = library.resolve_icon(cfg.icon)
+                            local ok, res = pcall(library.resolve_icon, cfg.icon)
+                            if ok and res then
+                                icon_data = res
+                            end
                         end
                         if not icon_data and library.icons and library.icons[cfg.icon] then
                             icon_data = library.icons[cfg.icon]
                         end
-                        if icon_data and icon_data.url then
+                        if type(icon_data) == "table" and icon_data.url then
                             icon_url = icon_data.url
+                        elseif type(icon_data) == "string" then
+                            icon_url = icon_data
                         elseif cfg.icon:find("^rbxassetid://") or cfg.icon:find("^http") or cfg.icon:find("^rbxthumb://") then
                             icon_url = cfg.icon
                         end
@@ -1418,7 +1423,10 @@
                 local sec_icon_data = nil
                 if type(cfg.icon) == "string" then
                     if library.resolve_icon then
-                        sec_icon_data = library.resolve_icon(cfg.icon)
+                        local ok, res = pcall(library.resolve_icon, cfg.icon)
+                        if ok and res then
+                            sec_icon_data = res
+                        end
                     end
                     if not sec_icon_data and library.icons and library.icons[cfg.icon] then
                         sec_icon_data = library.icons[cfg.icon]
@@ -1426,8 +1434,10 @@
                     if not sec_icon_data and ICONS and ICONS[cfg.icon] then
                         sec_icon_data = ICONS[cfg.icon]
                     end
-                    if sec_icon_data and sec_icon_data.url then
+                    if type(sec_icon_data) == "table" and sec_icon_data.url then
                         sec_icon_url = sec_icon_data.url
+                    elseif type(sec_icon_data) == "string" then
+                        sec_icon_url = sec_icon_data
                     elseif cfg.icon:find("^rbxassetid://") or cfg.icon:find("^http") or cfg.icon:find("^rbxthumb://") then
                         sec_icon_url = cfg.icon
                     end
@@ -2096,7 +2106,7 @@
 
         function library:dropdown(options) 
             local cfg = {
-                name = options.name or nil;
+                name = options.name or "Dropdown";
                 info = options.info or nil;
                 flag = options.flag or library:next_flag();
                 options = options.items or {""};
@@ -2115,7 +2125,7 @@
                 seperator = options.seperator or options.Seperator or true;
             }   
 
-            cfg.default = options.default or (cfg.multi and {cfg.items[1]}) or cfg.items[1] or "None"
+            cfg.default = options.default or (cfg.multi and {cfg.options[1]}) or cfg.options[1] or "None"
             flags[cfg.flag] = cfg.default
 
             local items = cfg.items; do 
@@ -2139,7 +2149,7 @@
                         FontFace = fonts.small;
                         TextColor3 = rgb(245, 245, 245);
                         BorderColor3 = rgb(0, 0, 0);
-                        Text = "Dropdown";
+                        Text = cfg.name or "Dropdown";
                         Parent = items[ "dropdown_object" ];
                         Name = "\0";
                         Size = dim2(1, -(cfg.width + 10), 0, 0);
@@ -2339,11 +2349,12 @@
                 end
             end
             
-            function cfg.set(value)
+            function cfg.set(self_or_value, maybe_value)
+                local value = (maybe_value ~= nil or self_or_value == cfg) and maybe_value or self_or_value
                 local selected = {}
                 local isTable = type(value) == "table"
 
-                for _, option in cfg.option_instances do 
+                for _, option in ipairs(cfg.option_instances) do 
                     if option.Text == value or (isTable and find(value, option.Text)) then 
                         insert(selected, option.Text)
                         cfg.multi_items = selected
@@ -2353,23 +2364,35 @@
                     end
                 end
 
-                items[ "sub_text" ].Text = isTable and concat(selected, ", ") or selected[1] or ""
-                flags[cfg.flag] = isTable and selected or selected[1]
+                if isTable then
+                    items[ "sub_text" ].Text = concat(selected, ", ")
+                    flags[cfg.flag] = selected
+                else
+                    local display_text = selected[1] or (type(value) == "string" and value) or (type(value) == "number" and tostring(value)) or ""
+                    items[ "sub_text" ].Text = display_text
+                    flags[cfg.flag] = (selected[1] ~= nil) and selected[1] or value
+                end
                 
-                cfg.callback(flags[cfg.flag]) 
+                if type(cfg.callback) == "function" then
+                    cfg.callback(flags[cfg.flag])
+                end
             end
             
-            function cfg.refresh_options(list) 
+            function cfg.refresh_options(self_or_list, maybe_list) 
+                local list = (maybe_list ~= nil and type(maybe_list) == 'table') and maybe_list or self_or_list
+                if type(list) ~= 'table' then list = {} end
+                cfg.options = list
                 cfg.y_size = 0
 
-                for _, option in cfg.option_instances do 
-                    option:Destroy() 
+                for _, option in ipairs(cfg.option_instances) do 
+                    pcall(function() option:Destroy() end)
                 end
                 
                 cfg.option_instances = {} 
 
-                for _, option in list do 
-                    local button = cfg.render_option(option)
+                for _, option in ipairs(list) do 
+                    local optText = tostring(option or "")
+                    local button = cfg.render_option(optText)
                     local s = library.current_scale or 1
                     local optH = (button.AbsoluteSize.Y > 0 and (button.AbsoluteSize.Y / s)) or 18
                     cfg.y_size += optH + 6
@@ -2415,6 +2438,11 @@
                 end
             end
 
+            cfg.SetValues = cfg.refresh_options
+            cfg.set_values = cfg.refresh_options
+            cfg.Set = cfg.set
+            cfg.SetValue = cfg.set
+
             items[ "dropdown" ].MouseButton1Click:Connect(function()
                 cfg.open = not cfg.open 
                 
@@ -2438,7 +2466,6 @@
                 });
             end 
 
-            flags[cfg.flag] = {} 
             config_flags[cfg.flag] = cfg.set
             
             cfg.refresh_options(cfg.options)
@@ -3831,21 +3858,15 @@
         function notifications:fade(path, is_fading)
             local fading = is_fading and 1 or 0 
             
-            library:tween(path, {BackgroundTransparency = fading}, Enum.EasingStyle.Quad, 1)
+            library:tween(path, {BackgroundTransparency = fading}, Enum.EasingStyle.Quad, 0.35)
 
             for _, instance in path:GetDescendants() do 
-                if not instance:IsA("GuiObject") then 
-                    if instance:IsA("UIStroke") then
-                        library:tween(instance, {Transparency = fading}, Enum.EasingStyle.Quad, 1)
-                    end
-        
-                    continue
-                end 
-        
-                if instance:IsA("TextLabel") then
-                    library:tween(instance, {TextTransparency = fading})
-                elseif instance:IsA("Frame") then
-                    library:tween(instance, {BackgroundTransparency = instance.Transparency and 0.6 and is_fading and 1 or 0.6}, Enum.EasingStyle.Quad, 1)
+                if instance:IsA("UIStroke") then 
+                    library:tween(instance, {Transparency = fading}, Enum.EasingStyle.Quad, 0.35)
+                elseif instance:IsA("TextLabel") then 
+                    library:tween(instance, {TextTransparency = fading}, Enum.EasingStyle.Quad, 0.35)
+                elseif instance:IsA("Frame") then 
+                    library:tween(instance, {BackgroundTransparency = fading}, Enum.EasingStyle.Quad, 0.35)
                 end
             end
         end 
