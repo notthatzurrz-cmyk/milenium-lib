@@ -298,48 +298,65 @@
             return (y_cond and x_cond)
         end
 
-        function library:draggify(frame)
+        function library:draggify(frame, handles)
             local dragging = false 
-            local start_size = frame.Position
-            local start 
+            local drag_input = nil
+            local start_pos = frame.Position
+            local start_input_pos = nil
 
-            frame.InputBegan:Connect(function(input)
+            local function handle_input_began(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 
                     or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = true
-                    start = input.Position
-                    start_size = frame.Position
-                end
-            end)
+                    drag_input = input
+                    start_input_pos = input.Position
+                    start_pos = frame.Position
 
-            frame.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 
-                    or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = false
+                    local connection
+                    connection = input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End or input.UserInputState == Enum.UserInputState.Cancel then
+                            dragging = false
+                            drag_input = nil
+                            if connection then
+                                connection:Disconnect()
+                                connection = nil
+                            end
+                        end
+                    end)
                 end
-            end)
+            end
+
+            frame.Active = true
+            frame.InputBegan:Connect(handle_input_began)
+
+            if type(handles) == "table" then
+                for _, handle in ipairs(handles) do
+                    if typeof(handle) == "Instance" and handle:IsA("GuiObject") then
+                        handle.InputBegan:Connect(handle_input_began)
+                    end
+                end
+            end
 
             library:connection(uis.InputChanged, function(input, game_event) 
-                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement 
-                    or input.UserInputType == Enum.UserInputType.Touch) then
+                if dragging and (input == drag_input or input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     local viewport_x = camera.ViewportSize.X
                     local viewport_y = camera.ViewportSize.Y
 
                     local scale = library.current_scale or 1
-                    local delta_x = (input.Position.X - start.X) / scale
-                    local delta_y = (input.Position.Y - start.Y) / scale
+                    local delta_x = (input.Position.X - start_input_pos.X) / scale
+                    local delta_y = (input.Position.Y - start_input_pos.Y) / scale
                     local max_x = math.max(0, (viewport_x / scale) - frame.Size.X.Offset)
                     local max_y = math.max(0, (viewport_y / scale) - frame.Size.Y.Offset)
                     local current_position = dim2(
                         0,
                         clamp(
-                            start_size.X.Offset + delta_x,
+                            start_pos.X.Offset + delta_x,
                             0,
                             max_x
                         ),
                         0,
                         math.clamp(
-                            start_size.Y.Offset + delta_y,
+                            start_pos.Y.Offset + delta_y,
                             0,
                             max_y
                         )
@@ -347,6 +364,13 @@
 
                     library:tween(frame, {Position = current_position}, Enum.EasingStyle.Linear, 0.05)
                     library:close_element()
+                end
+            end)
+
+            library:connection(uis.InputEnded, function(input)
+                if input == drag_input or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                    drag_input = nil
                 end
             end)
         end 
@@ -512,17 +536,22 @@
         function library:window(properties)
             -- [MOBILE] Auto-fit window to mobile viewport
             local default_size = dim2(0, 700, 0, 565)
+            local prop_size = properties.size or properties.Size
+            local final_size = prop_size or default_size
             if is_mobile then
-                local w = clamp(viewport_size.X * 0.94, 320, 700)
-                local h = clamp(viewport_size.Y * 0.82, 340, 565)
-                default_size = dim2(0, w, 0, h)
+                local cur_vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or viewport_size
+                local max_w = math.clamp(cur_vp.X * 0.95, 320, 740)
+                local max_h = math.clamp(cur_vp.Y * 0.86, 320, 600)
+                local req_w = final_size.X.Offset > 0 and final_size.X.Offset or 700
+                local req_h = final_size.Y.Offset > 0 and final_size.Y.Offset or 565
+                final_size = dim2(0, math.min(req_w, max_w), 0, math.min(req_h, max_h))
             end
 
             local cfg = { 
                 suffix = properties.suffix or properties.Suffix or "tech";
                 name = properties.name or properties.Name or "nebula";
                 game_name = properties.gameInfo or properties.game_info or properties.GameInfo or "Milenium for Counter-Strike: Global Offensive";
-                size = properties.size or properties.Size or default_size;
+                size = final_size;
                 selected_tab;
                 items = {};
 
@@ -750,7 +779,12 @@
             end 
 
             do -- Other
-                library:draggify(items[ "main" ])
+                library:draggify(items[ "main" ], {
+                    items[ "side_frame" ],
+                    items[ "title" ],
+                    items[ "multi_holder" ],
+                    items[ "info" ],
+                })
                 library:resizify(items[ "main" ])
             end 
 
@@ -1082,6 +1116,9 @@
                 }
 
                 library:close_element()
+                if library.on_tab_changed then
+                    pcall(library.on_tab_changed, cfg)
+                end
             end
 
             items[ "button" ].MouseButton1Down:Connect(function()
@@ -1146,7 +1183,7 @@
                     });
                     
                     library:create( "UIPadding" , {
-                        PaddingBottom = dim(0, 10);
+                        PaddingBottom = dim(0, is_mobile and 80 or 40);
                         Parent = items[ "column" ]
                     });
                     
