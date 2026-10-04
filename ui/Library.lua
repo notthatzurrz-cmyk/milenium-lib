@@ -325,18 +325,23 @@
                     local viewport_x = camera.ViewportSize.X
                     local viewport_y = camera.ViewportSize.Y
 
+                    local scale = library.current_scale or 1
+                    local delta_x = (input.Position.X - start.X) / scale
+                    local delta_y = (input.Position.Y - start.Y) / scale
+                    local max_x = math.max(0, (viewport_x / scale) - frame.Size.X.Offset)
+                    local max_y = math.max(0, (viewport_y / scale) - frame.Size.Y.Offset)
                     local current_position = dim2(
                         0,
                         clamp(
-                            start_size.X.Offset + (input.Position.X - start.X),
+                            start_size.X.Offset + delta_x,
                             0,
-                            viewport_x - frame.Size.X.Offset
+                            max_x
                         ),
                         0,
                         math.clamp(
-                            start_size.Y.Offset + (input.Position.Y - start.Y),
+                            start_size.Y.Offset + delta_y,
                             0,
-                            viewport_y - frame.Size.Y.Offset
+                            max_y
                         )
                     )
 
@@ -1978,7 +1983,7 @@
                         Parent = self.items[ "elements" ];
                         Name = "\0";
                         BackgroundTransparency = 1;
-                        Size = dim2(1, 0, 0, 0);
+                        Size = dim2(1, 0, 0, 20);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.Y;
                         TextSize = 14;
@@ -1992,12 +1997,14 @@
                         Text = "Dropdown";
                         Parent = items[ "dropdown_object" ];
                         Name = "\0";
-                        Size = dim2(1, 0, 0, 0);
+                        Size = dim2(1, -(cfg.width + 10), 0, 0);
                         BackgroundTransparency = 1;
                         TextXAlignment = Enum.TextXAlignment.Left;
+                        TextYAlignment = Enum.TextYAlignment.Center;
                         BorderSizePixel = 0;
-                        AutomaticSize = Enum.AutomaticSize.XY;
-                        TextSize = 16;
+                        AutomaticSize = Enum.AutomaticSize.Y;
+                        TextWrapped = true;
+                        TextSize = 15;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
                     
@@ -2051,11 +2058,11 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Text = "";
                         AutoButtonColor = false;
-                        AnchorPoint = vec2(1, 0);
+                        AnchorPoint = vec2(1, 0.5);
                         Parent = items[ "right_components" ];
                         Name = "\0";
-                        Position = dim2(1, 0, 0, 0);
-                        Size = dim2(0, cfg.width, 0, 16);
+                        Position = dim2(1, 0, 0.5, 0);
+                        Size = dim2(0, cfg.width, 0, 18);
                         BorderSizePixel = 0;
                         TextSize = 14;
                         BackgroundColor3 = rgb(33, 33, 35)
@@ -2073,13 +2080,13 @@
                         Text = "awdawdawdawdawdawdawdaw";
                         Parent = items[ "dropdown" ];
                         Name = "\0";
-                        Size = dim2(1, -12, 0, 0);
+                        Size = dim2(1, -16, 1, 0);
                         BorderSizePixel = 0;
                         BackgroundTransparency = 1;
                         TextXAlignment = Enum.TextXAlignment.Left;
+                        TextYAlignment = Enum.TextYAlignment.Center;
                         TextTruncate = Enum.TextTruncate.AtEnd;
-                        AutomaticSize = Enum.AutomaticSize.Y;
-                        TextSize = 14;
+                        TextSize = 13;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
                     
@@ -2178,9 +2185,10 @@
             
             function cfg.set_visible(bool)
                 local a = bool and cfg.y_size or 0
-                library:tween(items[ "dropdown_holder" ], {Size = dim_offset(items[ "dropdown" ].AbsoluteSize.X, a)})
+                local s = library.current_scale or 1
+                library:tween(items[ "dropdown_holder" ], {Size = dim_offset(items[ "dropdown" ].AbsoluteSize.X / s, a)})
 
-                items[ "dropdown_holder" ].Position = dim2(0, items[ "dropdown" ].AbsolutePosition.X, 0, items[ "dropdown" ].AbsolutePosition.Y + 80)
+                items[ "dropdown_holder" ].Position = dim2(0, items[ "dropdown" ].AbsolutePosition.X / s, 0, (items[ "dropdown" ].AbsolutePosition.Y / s) + 80)
                 if not (self.sanity and library.current_open == self) then 
                     library:close_element(cfg)
                 end
@@ -2750,7 +2758,8 @@
             function cfg.set_visible(bool)
                 items[ "colorpicker_fade" ].BackgroundTransparency = 0
                 items[ "colorpicker_holder" ].Parent = bool and library[ "items" ] or library[ "other" ]
-                items[ "colorpicker_holder" ].Position = dim_offset(items[ "colorpicker" ].AbsolutePosition.X, items[ "colorpicker" ].AbsolutePosition.Y + items[ "colorpicker" ].AbsoluteSize.Y + 45)
+                local s = library.current_scale or 1
+                items[ "colorpicker_holder" ].Position = dim_offset(items[ "colorpicker" ].AbsolutePosition.X / s, (items[ "colorpicker" ].AbsolutePosition.Y / s) + (items[ "colorpicker" ].AbsoluteSize.Y / s) + 45)
 
                 library:tween(items[ "colorpicker_fade" ], {BackgroundTransparency = 1}, Enum.EasingStyle.Quad, 0.4)
                 library:tween(items[ "colorpicker_holder" ], {Position = items[ "colorpicker_holder" ].Position + dim_offset(0, 20)})
@@ -3288,9 +3297,10 @@
 
             function cfg.set_visible(bool)
                 local size = bool and cfg.y_size or 0
-                library:tween(items[ "dropdown" ], {Size = dim_offset(items[ "keybind_holder" ].AbsoluteSize.X, size)})
+                local s = library.current_scale or 1
+                library:tween(items[ "dropdown" ], {Size = dim_offset(items[ "keybind_holder" ].AbsoluteSize.X / s, size)})
 
-                items[ "dropdown" ].Position = dim_offset(items[ "keybind_holder" ].AbsolutePosition.X, items[ "keybind_holder" ].AbsolutePosition.Y + items[ "keybind_holder" ].AbsoluteSize.Y + 60)
+                items[ "dropdown" ].Position = dim_offset(items[ "keybind_holder" ].AbsolutePosition.X / s, (items[ "keybind_holder" ].AbsolutePosition.Y / s) + (items[ "keybind_holder" ].AbsoluteSize.Y / s) + 60)
             end
         
             items[ "keybind_holder" ].MouseButton1Down:Connect(function()
@@ -3498,8 +3508,9 @@
             end 
 
             function cfg.set_visible(bool)                 
+                local s = library.current_scale or 1
                 library:tween(items[ "outline" ], {Size = dim_offset(bool and 240 or 0, 0)})
-                items[ "outline" ].Position = dim_offset(items[ "tick" ].AbsolutePosition.X, items[ "tick" ].AbsolutePosition.Y + 90)
+                items[ "outline" ].Position = dim_offset(items[ "tick" ].AbsolutePosition.X / s, (items[ "tick" ].AbsolutePosition.Y / s) + 90)
                 library:close_element(cfg)
             end
             
