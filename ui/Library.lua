@@ -87,6 +87,28 @@
         current_open; 
     }
 
+    library.icons = {
+        sword = { url = "rbxassetid://10734975692", full = true },
+        swords = { url = "rbxassetid://10734975692", full = true },
+        eye = { url = "rbxassetid://10723346959", full = true },
+        angry = { url = "rbxassetid://10723376114", full = true },
+        flame = { url = "rbxassetid://10723376114", full = true },
+        box = { url = "rbxassetid://10734909540", full = true },
+        package = { url = "rbxassetid://10734909540", full = true },
+        ellipsis = { url = "rbxassetid://10734963400", full = true },
+        save = { url = "rbxassetid://10734941499", full = true },
+        settings = { url = "rbxassetid://10734950309", full = true },
+        sliders = { url = "rbxassetid://10734950309", full = true },
+        target = { url = "rbxassetid://10709769841", full = true },
+        crosshair = { url = "rbxassetid://10709769841", full = true },
+        circle = { url = "rbxassetid://10709797837", full = true },
+        shield = { url = "rbxassetid://10734951847", full = true },
+        users = { url = "rbxassetid://10734983995", full = true },
+        folder = { url = "rbxassetid://10723387563", full = true },
+        trophy = { url = "rbxassetid://10734978932", full = true },
+        zap = { url = "rbxassetid://10734983018", full = true },
+    }
+
     local themes = {
         preset = {
             accent = rgb(155, 150, 219),
@@ -575,15 +597,23 @@
             }); 
 
             local items = cfg.items; do
+                local cam = workspace.CurrentCamera
+                local vp = cam and cam.ViewportSize or viewport_size
+                local s = library.current_scale or 1
+                local cur_w = cfg.size.X.Offset > 0 and cfg.size.X.Offset or 700
+                local cur_h = cfg.size.Y.Offset > 0 and cfg.size.Y.Offset or 565
+                local cx = math.max(0, math.floor((vp.X / s - cur_w) / 2))
+                local cy = math.max(0, math.floor((vp.Y / s - cur_h) / 2))
+
                 items[ "main" ] = library:create( "Frame" , {
                     Parent = library[ "items" ];
                     Size = cfg.size;
                     Name = "\0";
-                    Position = dim2(0.5, -cfg.size.X.Offset / 2, 0.5, -cfg.size.Y.Offset / 2);
+                    Position = dim2(0, cx, 0, cy);
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
                     BackgroundColor3 = rgb(14, 14, 16)
-                }); items[ "main" ].Position = dim2(0, items[ "main" ].AbsolutePosition.X, 0, items[ "main" ].AbsolutePosition.Y)
+                });
                 
                 library:create( "UICorner" , {
                     Parent = items[ "main" ];
@@ -796,9 +826,32 @@
         end 
 
         function library:tab(properties)
+            local tab_name = properties.name or properties.Name or "visuals"
+            local chosen_icon = properties.icon or properties.Icon
+            if not chosen_icon or chosen_icon == "http://www.roblox.com/asset/?id=6034767608" or chosen_icon == "" then
+                local low_name = tab_name:lower()
+                if low_name:find("aim") then
+                    chosen_icon = "sword"
+                elseif low_name:find("vis") then
+                    chosen_icon = "eye"
+                elseif low_name:find("rage") then
+                    chosen_icon = "angry"
+                elseif low_name:find("hvh") then
+                    chosen_icon = "swords"
+                elseif low_name:find("auto") then
+                    chosen_icon = "box"
+                elseif low_name:find("misc") then
+                    chosen_icon = "ellipsis"
+                elseif low_name:find("config") or low_name:find("setting") then
+                    chosen_icon = "save"
+                else
+                    chosen_icon = "circle"
+                end
+            end
+
             local cfg = {
-                name = properties.name or properties.Name or "visuals"; 
-                icon = properties.icon or properties.Icon or "http://www.roblox.com/asset/?id=6034767608";
+                name = tab_name; 
+                icon = chosen_icon;
                 
                 tabs = properties.tabs or properties.Tabs or {"Main", "Misc.", "Settings"};
                 pages = {}; 
@@ -840,12 +893,28 @@
                         BackgroundColor3 = rgb(29, 29, 29)
                     });
                     
+                    local icon_url = "rbxassetid://10709752035"
+                    local icon_data = nil
+                    if type(cfg.icon) == "string" then
+                        if library.resolve_icon then
+                            icon_data = library.resolve_icon(cfg.icon)
+                        end
+                        if not icon_data and library.icons and library.icons[cfg.icon] then
+                            icon_data = library.icons[cfg.icon]
+                        end
+                        if icon_data and icon_data.url then
+                            icon_url = icon_data.url
+                        elseif cfg.icon:find("^rbxassetid://") or cfg.icon:find("^http") or cfg.icon:find("^rbxthumb://") then
+                            icon_url = cfg.icon
+                        end
+                    end
+
                     items[ "icon" ] = library:create( "ImageLabel" , {
                         ImageColor3 = rgb(72, 72, 73);
                         BorderColor3 = rgb(0, 0, 0);
                         Parent = items[ "button" ];
                         AnchorPoint = vec2(0, 0.5);
-                        Image = "http://www.roblox.com/asset/?id=6034767608";
+                        Image = icon_url;
                         BackgroundTransparency = 1;
                         Position = dim2(0, 10, 0.5, 0);
                         Name = "\0";
@@ -853,6 +922,16 @@
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(255, 255, 255)
                     }); library:apply_theme(items[ "icon" ], "accent", "ImageColor3");
+
+                    if icon_data then
+                        if icon_data.full then
+                            items["icon"].ImageRectSize = Vector2.new(0, 0)
+                            items["icon"].ImageRectOffset = Vector2.new(0, 0)
+                        elseif icon_data.size and icon_data.offset then
+                            items["icon"].ImageRectSize = icon_data.size
+                            items["icon"].ImageRectOffset = icon_data.offset
+                        end
+                    end
                     
                     items[ "name" ] = library:create( "TextLabel" , {
                         FontFace = fonts.font;
@@ -1335,12 +1414,31 @@
                     CornerRadius = dim(0, 7)
                 });
                 
+                local sec_icon_url = "rbxassetid://10709752035"
+                local sec_icon_data = nil
+                if type(cfg.icon) == "string" then
+                    if library.resolve_icon then
+                        sec_icon_data = library.resolve_icon(cfg.icon)
+                    end
+                    if not sec_icon_data and library.icons and library.icons[cfg.icon] then
+                        sec_icon_data = library.icons[cfg.icon]
+                    end
+                    if not sec_icon_data and ICONS and ICONS[cfg.icon] then
+                        sec_icon_data = ICONS[cfg.icon]
+                    end
+                    if sec_icon_data and sec_icon_data.url then
+                        sec_icon_url = sec_icon_data.url
+                    elseif cfg.icon:find("^rbxassetid://") or cfg.icon:find("^http") or cfg.icon:find("^rbxthumb://") then
+                        sec_icon_url = cfg.icon
+                    end
+                end
+
                 items[ "Icon" ] = library:create( "ImageLabel" , {
                     ImageColor3 = themes.preset.accent;
                     BorderColor3 = rgb(0, 0, 0);
                     Parent = items[ "button" ];
                     AnchorPoint = vec2(0, 0.5);
-                    Image = cfg.icon;
+                    Image = sec_icon_url;
                     BackgroundTransparency = 1;
                     Position = dim2(0, 10, 0.5, 0);
                     Name = "\0";
@@ -1348,6 +1446,16 @@
                     BorderSizePixel = 0;
                     BackgroundColor3 = rgb(255, 255, 255)
                 }); library:apply_theme(items[ "Icon" ], "accent", "ImageColor3");
+
+                if sec_icon_data then
+                    if sec_icon_data.full then
+                        items["Icon"].ImageRectSize = Vector2.new(0, 0)
+                        items["Icon"].ImageRectOffset = Vector2.new(0, 0)
+                    elseif sec_icon_data.size and sec_icon_data.offset then
+                        items["Icon"].ImageRectSize = sec_icon_data.size
+                        items["Icon"].ImageRectOffset = sec_icon_data.offset
+                    end
+                end
                 
                 items[ "section_title" ] = library:create( "TextLabel" , {
                     FontFace = fonts.font;
@@ -2262,7 +2370,9 @@
 
                 for _, option in list do 
                     local button = cfg.render_option(option)
-                    cfg.y_size += button.AbsoluteSize.Y + 6
+                    local s = library.current_scale or 1
+                    local optH = (button.AbsoluteSize.Y > 0 and (button.AbsoluteSize.Y / s)) or 18
+                    cfg.y_size += optH + 6
                     insert(cfg.option_instances, button)
                     
                     button.MouseButton1Down:Connect(function()
@@ -3241,7 +3351,9 @@
                         }); cfg.hold_instances[option] = name
                         library:apply_theme(name, "accent", "TextColor3")
                         
-                        cfg.y_size += name.AbsoluteSize.Y
+                        local s = library.current_scale or 1
+                        local optH = (name.AbsoluteSize.Y > 0 and (name.AbsoluteSize.Y / s)) or 16
+                        cfg.y_size += optH
 
                         library:create( "UIPadding" , {
                             Parent = name;
